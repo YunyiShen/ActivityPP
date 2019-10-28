@@ -1,0 +1,209 @@
+---
+title: "Evaluate Temporal Overlap using Absolute Encounter Intensity"
+author: "Yunyi Shen"
+date: "10/27/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+#knitr::opts_chunk$set(echo = TRUE)
+require(dplyr)
+require(ggplot2)
+require(grid)
+require(Rcpp)
+source("R/Fourier_est.R")
+sourceCpp("src/Fourier_calc.cpp")
+vplayout <- function(x, y) viewport(layout.pos.row = x, layout.pos.col = y)
+
+rawdata = read.csv("_data_/CleanEvents.csv",stringsAsFactors = F)
+rawdata$Date_Time = as.POSIXct( paste(rawdata$Date,rawdata$Time),format = "%Y/%m/%d %H:%M:%OS")
+
+rawdata = na.omit(rawdata)
+
+mindate_st = min(rawdata$Date_Time[rawdata$Site=="Stockton"]) %>%
+  as.character()%>%
+  substr(1,10) %>%
+  paste("00:00:00") %>%
+  as.POSIXct(format = "%Y-%m-%d %H:%M:%OS") %>%
+  as.numeric() # first second at the first detection day
+
+rawdata$sec = as.numeric(rawdata$Date_Time)-as.numeric(mindate_st)# all in seconds
+
+# species
+spplist = unique(rawdata$Species)
+
+# data of stockton
+stockton = lapply(unique(rawdata$Species), function(spp,rawdata){
+  rawdata[rawdata$Site=="Stockton" & rawdata$Species==spp,]
+},rawdata)
+
+names(stockton) = unique(rawdata$Species)
+
+# time at event
+event_time = lapply(stockton,function(kk){sort(kk$sec)})
+
+
+spplist = names(event_time)[sapply(event_time, length)>3]
+
+event_time_list = lapply(spplist, function(spp,event_time){
+  event_time[[spp]]
+},event_time)
+
+names(event_time_list) = spplist
+
+period = 24*3600 # period, a day, can be change based on sun
+
+```
+
+## Model Daily Activity Pattern using Time Inhomogeneous Poisson Process with Periodic Intensity Function
+
+Detection of camera trapping can be viewed as time-to-event data. One common selection to model this type of process is Poisson point process. Two main assumptions for Poisson point process are:
+
+- Independency: Number of events in any disjoint time intervals are independent
+
+- Ordinariness:
+
+$$
+P(N(t+\delta t)-N(t)=1)=\lambda(t)\delta t + o(\delta t)
+$$
+$$
+P(N(t+\delta t)-N(t)>1)=o(\delta t)
+$$
+From assumption 1, we can derive the waiting time ($T-T_0$, how long did it take from time $T_0$ to next event)'s distribution to be:
+$$
+P(T-T_0>t)=exp(\int_{T_0}^{T}\lambda(u)du)
+$$
+
+Denote $\int_{0}^{t}\lambda(u)du=\Lambda(t)$, then $\int_{T_0}^{T}\lambda(u)du=\Lambda(T)-\Lambda(T_0)$. The $\lambda(t)\ge 0$ is called *intensity function* and $\Lambda(t)$ is called *leading function* of the process. The *intensity function* can be understand as in a short time period, how many events (e.g. detections) should be expect.
+
+From assumption 1 and 2, we derive the likelihood function for time-at-event. Denote time to the $ith$ event as $T_i$, then $X_i=T_i-T_{i-1}$ and $X_0=T_0$
+
+$$
+f_{T_1,T_2...T_n}=exp(-\Lambda(T_n))\prod_{i=0}^{n}\lambda(T_i)
+$$
+
+
+To model daily activity pattern from time-to-event data, we can consider a family of periodic intensity function with period of $P=1\ day=86400s$. To construct this family of positive periodic functions, we could use an exponential of Fourier series with amplitude parameters $A_i$ and phase parameters $\phi_i$ and $N$ terms, i.e. 
+
+$$
+\lambda (t)=exp(\frac{T_0}{2}+\sum_{i=1}^NA_icos(\frac{2\pi it}{P}-\phi_i))
+$$
+
+Then plug into likelihood function, we can have a MLE for parameters of the Fourier series and also an AIC to help us choose $N$.
+
+
+## Result from the intensity function
+
+From the intensity function of different species, we can derive different probabilities. Denote $\lambda_i(t)$ as the detection intensity of species $i$.
+
+Then 
+$$\int_{0}^P\lambda(u)du$$ 
+is the detection probability for a day. 
+
+Also we have:
+
+$$
+P(\text{it is spp i}|\text{detect spp i or j at t})=\frac{\lambda_i(t)}{\lambda_i(t)+\lambda_j(t)}
+$$
+
+## Some results with APIS, Stockton data:
+
+AIC table for number of Fourier terms:
+
+```{r echo = F,warning=FALSE,message=FALSE,error=FALSE, fig.height=6, fig.width=6}
+set.seed(42)
+MLE_fourier3 = lapply(event_time_list,function(ww){
+  optim(runif(7),logL,n=3,event_time = ww,method = "BFGS",control = list(maxit = 1000))
+}) # MLE using event-time
+
+conv3 = sapply(MLE_fourier3,function(w){w$convergence}) # check convergence
+
+
+AICs_3 = sapply(MLE_fourier3,function(ww){
+  2*length(ww$par)+2*ww$value
+
+})
+
+MLE_fourier4 = lapply(event_time_list,function(ww){
+  optim(runif(9),logL,n=4,event_time = ww,method = "BFGS",control = list(maxit = 1000))
+}) # MLE using event-time
+
+conv4 = sapply(MLE_fourier4,function(w){w$convergence}) # check convergence
+
+
+AICs_4 = sapply(MLE_fourier4,function(ww){
+  2*length(ww$par)+2*ww$value
+
+})
+
+AIC_table = rbind(AICs_3,AICs_4)
+row.names(AIC_table) = c("N=3","N=4")
+
+knitr::kable(AIC_table[,c("Bear_black","Coyote","Fox_red")],caption = "Sample AIC table")
+
+```
+
+
+Absolute intensity of fox and coyote:
+
+```{r echo = F,warning=FALSE,message=FALSE,error=FALSE, fig.height=3, fig.width=9}
+predic_fourier = lapply(MLE_fourier3,function(res){
+  lambda_Fourier_series(seq(0,86400,1),3 # number of terms
+                        ,res$par[1] # intercept
+                        ,res$par[2:4] # amplitude
+                        ,86400 # period, a day
+                        ,res$par[5:7]) # phase
+}) # predict one day's intensity function using the fitted Fourier series
+
+predic_fourier4 = lapply(MLE_fourier4,function(res){
+  lambda_Fourier_series(seq(0,86400,1),4 # number of terms
+                        ,res$par[1] # intercept
+                        ,res$par[2:5] # amplitude
+                        ,86400 # period, a day
+                        ,res$par[6:9]) # phase
+})
+
+detection_rate = lapply(MLE_fourier3,function(res){
+  1-exp(-Lambda_Numeric_int(86400,3
+                        ,res$par[1]
+                        ,res$par[2:4]
+                        ,86400
+                        ,res$par[5:7],10000))
+}) # detection rate per day calculated using integral of detection intensity for a day
+
+
+times = seq(0,86400,1)
+
+plotdata = data.frame(time = times,lambda = predic_fourier$Coyote,spp = "Coyote")
+plotdata = rbind(plotdata,data.frame(time = times,lambda = predic_fourier4$Fox_red,spp = "Red Fox"),data.frame(time = times,lambda = predic_fourier$Bear_black,spp = "Bear"))
+
+ratiodata = data.frame(time = times,ratio = predic_fourier$Coyote/(predic_fourier$Coyote+predic_fourier4$Fox_red),spp = "coyote-fox")
+
+ratiodata = rbind(ratiodata,data.frame(time = times,ratio = predic_fourier$Bear_black/(predic_fourier$Bear_black+predic_fourier4$Fox_red),spp = "bear-fox"),data.frame(time = times,ratio = predic_fourier$Bear/(predic_fourier$Coyote+predic_fourier$Bear_black),spp = "bear-coyote"))
+
+sepr = ggplot2::ggplot(plotdata,aes(x=time,y=lambda)) + 
+  geom_line(aes(color = spp)) + 
+  labs(x="time/s")+
+  ggtitle("intensity")
+  
+ratio = ggplot(ratiodata,aes(x=time,y=ratio)) + 
+  geom_line(aes(color=spp))+
+  labs(x="time/s",y="lambda_c/(lambda_c+lambda_f)")+
+  ggtitle("intensity ratio")
+
+grid.newpage()
+pushViewport(viewport(layout = grid.layout(1, 2)))
+print(sepr, vp = vplayout(1, 1))
+print(ratio, vp = vplayout(1, 2))
+
+
+
+Dettable = (unlist(detection_rate))
+
+
+
+knitr::kable(Dettable[c("Bear_black","Coyote","Fox_red")],caption = "Daily Detection Probability",col.names = "P")
+
+```
+
+For fox, the intensity did not changed so much compare with coyote, and in most of the time, we should expect to see a coyote rather than a red fox.
