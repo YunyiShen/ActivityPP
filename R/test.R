@@ -53,43 +53,13 @@ AICs = lapply(MLE_fourier,function(ww){
 
 })
 
-predic_fourier = lapply(MLE_fourier,function(res){
-  lambda_Fourier_series(seq(0,86400,1),3 # number of terms
-                        ,res$par[1] # intercept
-                        ,res$par[2:4] # amplitude
-                        ,86400 # period, a day
-                        ,res$par[5:7]) # phase
-}) # predict one day's intensity function using the fitted Fourier series
-
-detection_rate = lapply(MLE_fourier,function(res){
-  1-exp(-Lambda_Numeric_int(86400,3
-                        ,res$par[1]
-                        ,res$par[2:4]
-                        ,86400
-                        ,res$par[5:7],10000))
-}) # detection rate per day calculated using integral of detection intensity for a day
-
-
-plot(predic_fourier$Coyote/(predic_fourier$Fox_red+predic_fourier$Coyote))
-# this calculate at a certain time point, given we see a coyote or a fox
-#  , what is the probability that is a coyote rather than a fox
-
 set.seed(42)
-test_sampleCpp = ActivityPP_samplerCPP(event_time_list$Bear_black,
-                                    n_sample = 5,
-                                    n_burn_in = 5,
-                                    thin_by = 1,
-                                    n=3,n_points = 3000,P=86400,
-                                    prop_var = 1)
 
-
-set.seed(42)
-test_sample = ActivityPP_sampler(event_time_list$Bear_black,
-                                       n_sample = 5,
-                                       n_burn_in = 5,
-                                       thin_by = 1,
-                                       n=3,n_points = 3000,P=86400,
-                                       prop_var = 1)
-
-
-
+MCMC_fourier = lapply(event_time_list,function(ww){
+  ActivityPP_sampler(event_time_list$Bear_black,
+                     n_sample = 5,
+                     n_burn_in = 5,
+                     thin_by = 1,
+                     n=3,n_points = 3000,P=86400,
+                     prop_var = 1)
+})
