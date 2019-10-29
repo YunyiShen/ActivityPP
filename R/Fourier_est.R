@@ -12,29 +12,23 @@ ActivityPP_sampler = function(event_time,n_sample = 1000,n_burn_in=1000,thin_by 
 	res = mcmc(matrix(NA,nrow = ceiling( n_sample/thin_by),ncol = 2*n+1),thin = thin_by)
 
 	ini = c( runif(n+1),sapply(1:n,function(i,P){
-	  runif(1,0 , (P/(i*2)))
+	  runif(1,0 , pi)
 	},P) )
-	curr_par = optim(ini,logL,event_time=event_time,n=n,P=P,n_points = n_points,method = "BFGS",control = list(maxit = 1000))$par
+	#curr_par = optim(ini,logL,event_time=event_time,n=n,P=P,n_points = n_points,method = "BFGS",control = list(maxit = 1000))$par
+	curr_par = ini
 	curr_posterior = -logL(curr_par,event_time,n,P,n_points)
-
+  prop_par = curr_par
 	## NEED TO FIX THE RANGE OF PHASE PARAMETER!!
 	for(i in 1:(n_sample+n_burn_in)){
-		prop_par = curr_par + rnorm(2*n+1,0,prop_var)
+		prop_par[0:n+1] = curr_par[0:n+1] + rnorm(n+1,0,prop_var)
+    prop_par[1:n + n + 1] = runif(n,0,pi)
+		prop_posterior = -logL(prop_par,event_time,n,P,n_points)
 
-		phase_half_period = lapply(1:n,function(i,par,P){
-			par[n+1+i]>=0 & par[n+1+i]<(P/(i*2))
-		},prop_par,P)
-
-		phase_half_period = Reduce("&",phase_half_period)
-		if(phase_half_period){
-
-			prop_posterior = -logL(prop_par,event_time,n,P,n_points)
-
-			if(runif(1)<exp(prop_posterior-curr_posterior)){
-				curr_par = prop_par
-				curr_posterior = prop_posterior
-			}
+		if(runif(1)<exp(prop_posterior-curr_posterior)){
+			curr_par = prop_par
+			curr_posterior = prop_posterior
 		}
+
 
 
 
