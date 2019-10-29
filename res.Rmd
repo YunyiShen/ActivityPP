@@ -106,6 +106,10 @@ $$
 P(\text{it is spp i}|\text{detect spp i or j at t})=\frac{\lambda_i(t)}{\lambda_i(t)+\lambda_j(t)}
 $$
 
+## Estimation
+
+Since likelihood is tractable, we can do MLE on amplitude and phase parameters of the Fourier series. AIC can be calculated based on $N$, the number of terms (smoothness) of the Fourier series using the fact that number of parameters is $2N+1$. 
+
 ## Some results with APIS, Stockton data:
 
 AIC table for number of Fourier terms:

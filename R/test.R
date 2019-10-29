@@ -1,4 +1,5 @@
 require(dplyr)
+require(Rcpp)
 source("./R/Fourier_est.R")
 sourceCpp("./src/Fourier_calc.cpp")
 
@@ -72,3 +73,9 @@ detection_rate = lapply(MLE_fourier,function(res){
 plot(predic_fourier$Coyote/(predic_fourier$Fox_red+predic_fourier$Coyote))
 # this calculate at a certain time point, given we see a coyote or a fox
 #  , what is the probability that is a coyote rather than a fox
+
+
+test_sample = ActivityPP_sampler(event_time_list$Coyote,n_sample = 100000,n_burn_in = 50000,thin_by = 50,n=2)
+
+
+
