@@ -74,8 +74,22 @@ plot(predic_fourier$Coyote/(predic_fourier$Fox_red+predic_fourier$Coyote))
 # this calculate at a certain time point, given we see a coyote or a fox
 #  , what is the probability that is a coyote rather than a fox
 
+set.seed(42)
+test_sampleCpp = ActivityPP_samplerCPP(event_time_list$Bear_black,
+                                    n_sample = 5,
+                                    n_burn_in = 5,
+                                    thin_by = 1,
+                                    n=3,n_points = 3000,P=86400,
+                                    prop_var = 1)
 
-test_sample = ActivityPP_sampler(event_time_list$Bear_black,n_sample = 50000,n_burn_in = 5000,thin_by = 10,n=3)
+
+set.seed(42)
+test_sample = ActivityPP_sampler(event_time_list$Bear_black,
+                                       n_sample = 5,
+                                       n_burn_in = 5,
+                                       thin_by = 1,
+                                       n=3,n_points = 3000,P=86400,
+                                       prop_var = 1)
 
 
 

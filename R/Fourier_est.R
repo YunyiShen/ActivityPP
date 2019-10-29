@@ -17,16 +17,22 @@ ActivityPP_sampler = function(event_time,n_sample = 1000,n_burn_in=1000,thin_by 
 	#curr_par = optim(ini,logL,event_time=event_time,n=n,P=P,n_points = n_points,method = "BFGS",control = list(maxit = 1000))$par
 	curr_par = ini
 	curr_posterior = -logL(curr_par,event_time,n,P,n_points)
+	#cat(curr_posterior,"/n")
   prop_par = curr_par
 	## NEED TO FIX THE RANGE OF PHASE PARAMETER!!
 	for(i in 1:(n_sample+n_burn_in)){
 		prop_par[0:n+1] = curr_par[0:n+1] + rnorm(n+1,0,prop_var)
     prop_par[1:n + n + 1] = runif(n,0,pi)
 		prop_posterior = -logL(prop_par,event_time,n,P,n_points)
-
-		if(runif(1)<exp(prop_posterior-curr_posterior)){
+    #cat(prop_posterior,"\n")
+		#if(exp(prop_posterior-curr_posterior)>0) cat(exp(prop_posterior-curr_posterior),"\n")
+    rn = runif(1)
+    #cat(rn,"\n")
+    cat("curr:",curr_posterior,"prop:",prop_posterior,"\n")
+		if(rn<exp(prop_posterior-curr_posterior)){
 			curr_par = prop_par
 			curr_posterior = prop_posterior
+			cat(i,"accepted\n")
 		}
 
 
