@@ -56,7 +56,7 @@ AICs = lapply(MLE_fourier,function(ww){
 set.seed(42)
 
 MCMC_fourier = lapply(event_time_list,function(ww){
-  ActivityPP_sampler(event_time_list$Bear_black,
+  ActivityPP_sampler(ww,
                      n_sample = 500000,
                      n_burn_in = 50000,
                      thin_by = 250,
