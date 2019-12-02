@@ -59,9 +59,9 @@ set.seed(42)
 
 MCMC_fourier = lapply(event_time_list,function(ww){
   ActivityPP_sampler(ww,
-                     n_sample = 50000,
-                     n_burn_in = 5000,
-                     thin_by = 50,
+                     n_sample = 500000,
+                     n_burn_in = 50000,
+                     thin_by = 250,
                      n=2,n_points = 3000,P=86400,
                      prop_var = .1)
 })
