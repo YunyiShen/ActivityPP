@@ -2,9 +2,10 @@ require(dplyr)
 require(Rcpp)
 source("./R/Fourier_est.R")
 sourceCpp("./src/Fourier_calc.cpp")
+sourceCpp("./src/STTC.cpp")
 
 rawdata = read.csv("_data_/CleanEvents.csv",stringsAsFactors = F)
-rawdata$Date_Time = as.POSIXct( paste(rawdata$Date,rawdata$Time),format = "%Y/%m/%d %H:%M:%OS")
+rawdata$Date_Time = as.POSIXct( paste(rawdata$Date,rawdata$Date.Time),format = "%Y/%m/%d %H:%M:%OS")
 
 rawdata = na.omit(rawdata)
 
@@ -31,7 +32,7 @@ names(stockton) = unique(rawdata$Species)
 event_time = lapply(stockton,function(kk){sort(kk$sec)})
 
 
-spplist = names(event_time)[sapply(event_time, length)>3]
+spplist = names(event_time)[sapply(event_time, length)>100]
 
 event_time_list = lapply(spplist, function(spp,event_time){
   event_time[[spp]]
@@ -55,11 +56,40 @@ AICs = lapply(MLE_fourier,function(ww){
 
 set.seed(42)
 
+
 MCMC_fourier = lapply(event_time_list,function(ww){
-  ActivityPP_sampler(event_time_list$Bear_black,
-                     n_sample = 500000,
-                     n_burn_in = 50000,
-                     thin_by = 250,
+  ActivityPP_sampler(ww,
+                     n_sample = 50000,
+                     n_burn_in = 5000,
+                     thin_by = 50,
                      n=2,n_points = 3000,P=86400,
                      prop_var = .1)
 })
+
+
+Time_range = c(0,max(unlist(event_time)))
+
+run_sttc(Time_range,event_time_list$Bear_black,event_time_list$Squirrel,200)
+
+dts = 10^(seq(3,6,0.1))
+
+STTC_dt = sapply(dts,function(dt,Tr,e1,e2){
+  run_sttc(Tr,e1,e2,dt)
+
+
+},Time_range,event_time$Bobcat
+,event_time$Fox_red)
+
+
+plot(log(dts),STTC_dt)
+
+require(ggplot2)
+
+
+ggplot(data = data.frame(dt=log(dts/3600),STTC = STTC_dt),aes(x=dt,y=STTC))+
+  geom_point() +
+  geom_line()+
+  geom_smooth() +
+  geom_hline(yintercept = 0)
+
+
